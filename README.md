@@ -1,5 +1,7 @@
 # albumbin
 
+look all this came with the template. it's a rest api. get over it.
+
 generated using Luminus version "2.9.10.84"
 
 FIXME
