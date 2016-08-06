@@ -8,9 +8,29 @@
             [bouncer.validators :as v]
             [albumbin.db.core :as db]))
 
+(defn validate-user [params]
+  (first
+    (b/validate params
+                :email [v/required [v/email]]
+                :username [v/required [v/max-count 30]]
+                :password v/required
+                :repeat-password v/required)))
+
 (defn create-user! [params]
-  (db/create-user! (update (merge params {:id  (str (java.util.UUID/randomUUID))}) :password hashers/derive))
-  {:status 201})
+  (if-let [error (validate-user params)]
+    {:status 400 :body {:error error}}
+    (cond (not= (:password params) (:repeat-password params))
+          {:status 400 :body {:error "passwords must match"}}
+
+          (db/get-user-by-email {:email (:email params)}) 
+          {:status 400 :body {:error "email already registerd"}} 
+
+          :else 
+          (do
+            (db/create-user! (update (merge params 
+                                          {:id  (str (java.util.UUID/randomUUID))}) 
+                                   :password hashers/derive))
+            {:status 201}))))
 
 (defn authenticate-user [email password]
   (let [user (db/get-user-by-email {:email email})]
@@ -21,3 +41,4 @@
 (defroutes user-routes
   (GET "/user" {{email :email password :password} :params} (authenticate-user email password))
   (POST "/user" {params :params} (create-user! params)))
+
