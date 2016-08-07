@@ -7,11 +7,10 @@
             [ring.middleware.json :refer [wrap-json-response]]
             [albumbin.config :refer [env]]
             [ring.middleware.flash :refer [wrap-flash]]
-            [immutant.web.middleware :refer [wrap-session]]
             [ring.middleware.defaults :refer [site-defaults wrap-defaults]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
-            [buddy.auth.backends.session :refer [session-backend]]
-            [buddy.auth.accessrules :refer [restrict]]
+            [buddy.auth.backends.token :refer [jws-backend]]
+            [buddy.auth.accessrules :refer [restrict wrap-access-rules]]
             [buddy.auth :refer [authenticated?]]
             [albumbin.layout :refer [*identity*]])
   (:import [javax.servlet ServletContext]))
@@ -51,13 +50,15 @@
       ((if (:websocket? request) handler wrapped) request))))
 
 (defn on-error [request response]
-  (error-page
-    {:status 403
-     :title (str "Access to " (:uri request) " is not authorized")}))
+  {:status 403
+   :body {:error (str "Access to " (:uri request) " is not authorized")}})
 
 (defn wrap-restricted [handler]
   (restrict handler {:handler authenticated?
                      :on-error on-error}))
+
+(def auth-rules [{:uri "/album" :handler authenticated? :request-method :post}])
+
 
 (defn wrap-identity [handler]
   (fn [request]
@@ -65,19 +66,18 @@
       (handler request))))
 
 (defn wrap-auth [handler]
-  (let [backend (session-backend)]
+  (let [backend (jws-backend {:secret "blah"})]
     (-> handler
         wrap-identity
         (wrap-authentication backend)
-        (wrap-authorization backend))))
+        (wrap-authorization backend)
+        (wrap-access-rules {:rules auth-rules :on-error on-error}))))
 
 (defn wrap-base [handler]
   (-> ((:middleware defaults) handler)
       wrap-auth
       wrap-webjars
-      wrap-flash
       wrap-json-response
-      (wrap-session {:cookie-attrs {:http-only true}})
       (wrap-defaults
         (-> site-defaults
             (assoc-in [:security :anti-forgery] false)

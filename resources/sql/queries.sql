@@ -24,3 +24,10 @@ WHERE email = :email
 -- :doc delete a user given the id
 DELETE FROM users
 WHERE id = :id
+
+-- :name create-album! :! :n
+-- :doc creates a new album record
+INSERT INTO users
+(id, userid, musicbrainzid, review, posted)
+VALUES (:id, :userid, :musicbrainzid, :review, :posted)
+
